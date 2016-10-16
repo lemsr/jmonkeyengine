@@ -7,9 +7,9 @@ package com.jme3.util.mikktspace;
 
 import com.jme3.math.FastMath;
 import com.jme3.math.Vector3f;
-import com.jme3.scene.*;
-import com.jme3.util.*;
-
+import com.jme3.scene.Geometry;
+import com.jme3.scene.Node;
+import com.jme3.scene.Spatial;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -23,7 +23,7 @@ import java.util.logging.Logger;
  * https://developer.blender.org/diffusion/B/browse/master/intern/mikktspace/mikktspace.c
  * https://developer.blender.org/diffusion/B/browse/master/intern/mikktspace/mikktspace.h
  * 
- * MikkTspace looks like the new standard of tangent generation in 3D softwares.
+ * MikkTspace looks like the new standard of tengent generation in 3D softwares.
  * Xnormal, Blender, Substance painter, and many more use it.
  * 
  * Usage is :
@@ -84,7 +84,6 @@ public class MikktspaceTangentGenerator {
             if(!genTangSpaceDefault(context)){
                 Logger.getLogger(MikktspaceTangentGenerator.class.getName()).log(Level.SEVERE, "Failed to generate tangents for geometry " + g.getName());
             }
-            TangentUtils.generateBindPoseTangentsIfNecessary(g.getMesh());
         }
     }
     

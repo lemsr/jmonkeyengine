@@ -59,8 +59,6 @@ public interface ALC {
      */
     static final int ALC_DEFAULT_ALL_DEVICES_SPECIFIER = 0x1012;
     static final int ALC_ALL_DEVICES_SPECIFIER = 0x1013;
-
-    //public static ALCCapabilities createCapabilities(long device);
     
     public void createALC();
     public void destroyALC();

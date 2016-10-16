@@ -50,9 +50,8 @@ public abstract class ParticleMesh extends Mesh {
     public enum Type {
         /**
          * The particle mesh is composed of points. Each particle is a point.
-         * Note that point based particles do not support certain features such
-         * as {@link ParticleEmitter#setRotateSpeed(float) rotation}, and
-         * {@link ParticleEmitter#setFacingVelocity(boolean) velocity following}.
+         * This can be used in conjuction with {@link RenderState#setPointSprite(boolean) point sprites}
+         * to render particles the usual way.
          */
         Point,
         

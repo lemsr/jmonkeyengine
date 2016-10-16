@@ -38,7 +38,6 @@ import com.jme3.collision.Collidable;
 import com.jme3.export.*;
 import com.jme3.light.Light;
 import com.jme3.light.LightList;
-import com.jme3.material.MatParamOverride;
 import com.jme3.material.Material;
 import com.jme3.math.*;
 import com.jme3.renderer.Camera;
@@ -122,10 +121,9 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
      */
     protected static final int RF_TRANSFORM = 0x01, // need light resort + combine transforms
                                RF_BOUND = 0x02,
-                               RF_LIGHTLIST = 0x04, // changes in light lists 
-                               RF_CHILD_LIGHTLIST = 0x08, // some child need geometry update
-                               RF_MATPARAM_OVERRIDE = 0x10;
-    
+                               RF_LIGHTLIST = 0x04, // changes in light lists
+                               RF_CHILD_LIGHTLIST = 0x08; // some child need geometry update
+
     protected CullHint cullHint = CullHint.Inherit;
     protected BatchHint batchHint = BatchHint.Inherit;
     /**
@@ -137,11 +135,7 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
      */
     protected LightList localLights;
     protected transient LightList worldLights;
-
-    protected SafeArrayList<MatParamOverride> localOverrides;
-    protected SafeArrayList<MatParamOverride> worldOverrides;
-
-    /** 
+    /**
      * This spatial's name.
      */
     protected String name;
@@ -201,14 +195,13 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
      */
     protected Spatial(String name) {
         this.name = name;
+
         localTransform = new Transform();
         worldTransform = new Transform();
 
         localLights = new LightList(this);
         worldLights = new LightList(this);
 
-        localOverrides = new SafeArrayList<>(MatParamOverride.class);
-        worldOverrides = new SafeArrayList<>(MatParamOverride.class);
         refreshFlags |= RF_BOUND;
     }
 
@@ -229,6 +222,7 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
     boolean requiresUpdates() {
         return requiresUpdates | !controls.isEmpty();
     }
+
     /**
      * Subclasses can call this with true to denote that they require
      * updateLogicalState() to be called even if they contain no controls.
@@ -278,29 +272,31 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
 
     protected void setLightListRefresh() {
         refreshFlags |= RF_LIGHTLIST;
+
         // Make sure next updateGeometricState() visits this branch
         // to update lights.
         Spatial p = parent;
         while (p != null) {
+            //if (p.refreshFlags != 0) {
+                // any refresh flag is sufficient,
+                // as each propagates to the root Node
+
+                // 2015/2/8:
+                // This is not true, because using e.g. getWorldBound()
+                // or getWorldTransform() activates a "partial refresh"
+                // which does not update the lights but does clear
+                // the refresh flags on the ancestors!
+
+            //    return;
+            //}
+
             if ((p.refreshFlags & RF_CHILD_LIGHTLIST) != 0) {
                 // The parent already has this flag,
                 // so must all ancestors.
                 return;
             }
+
             p.refreshFlags |= RF_CHILD_LIGHTLIST;
-            p = p.parent;
-        }
-    }
-
-    protected void setMatParamOverrideRefresh() {
-        refreshFlags |= RF_MATPARAM_OVERRIDE;
-        Spatial p = parent;
-        while (p != null) {
-            if ((p.refreshFlags & RF_MATPARAM_OVERRIDE) != 0) {
-                return;
-            }
-
-            p.refreshFlags |= RF_MATPARAM_OVERRIDE;
             p = p.parent;
         }
     }
@@ -322,6 +318,7 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
             p = p.parent;
         }
     }
+
     /**
      * (Internal use only) Forces a refresh of the given types of data.
      *
@@ -428,29 +425,6 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
     }
 
     /**
-     * Get the local material parameter overrides.
-     *
-     * @return The list of local material parameter overrides.
-     */
-    public SafeArrayList<MatParamOverride> getLocalMatParamOverrides() {
-        return localOverrides;
-    }
-
-    /**
-     * Get the world material parameter overrides.
-     *
-     * Note that this list is only updated on a call to
-     * {@link #updateGeometricState()}. After update, the world overrides list
-     * will contain the {@link #getParent() parent's} world overrides combined
-     * with this spatial's {@link #getLocalMatParamOverrides() local overrides}.
-     *
-     * @return The list of world material parameter overrides.
-     */
-    public SafeArrayList<MatParamOverride> getWorldMatParamOverrides() {
-        return worldOverrides;
-    }
-
-    /**
      * <code>getWorldRotation</code> retrieves the absolute rotation of the
      * Spatial.
      *
@@ -551,8 +525,10 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
         TempVars vars = TempVars.get();
 
         Vector3f compVecA = vars.vect4;
+
         compVecA.set(position).subtractLocal(worldTranslation);
         getLocalRotation().lookAt(compVecA, upVector);
+
         if ( getParent() != null ) {
             Quaternion rot=vars.quat1;
             rot =  rot.set(parent.getWorldRotation()).inverseLocal().multLocal(getLocalRotation());
@@ -579,61 +555,13 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
             worldLights.update(localLights, null);
             refreshFlags &= ~RF_LIGHTLIST;
         } else {
-            assert (parent.refreshFlags & RF_LIGHTLIST) == 0;
-            worldLights.update(localLights, parent.worldLights);
-            refreshFlags &= ~RF_LIGHTLIST;
+            if ((parent.refreshFlags & RF_LIGHTLIST) == 0) {
+                worldLights.update(localLights, parent.worldLights);
+                refreshFlags &= ~RF_LIGHTLIST;
+            } else {
+                assert false;
+            }
         }
-    }
-
-    protected void updateMatParamOverrides() {
-        refreshFlags &= ~RF_MATPARAM_OVERRIDE;
-
-        worldOverrides.clear();
-        if (parent == null) {
-            worldOverrides.addAll(localOverrides);
-        } else {
-            assert (parent.refreshFlags & RF_MATPARAM_OVERRIDE) == 0;
-            worldOverrides.addAll(parent.worldOverrides);
-            worldOverrides.addAll(localOverrides);
-        }
-    }
-
-    /**
-     * Adds a local material parameter override.
-     *
-     * @param override The override to add.
-     * @see MatParamOverride
-     */
-    public void addMatParamOverride(MatParamOverride override) {
-        if (override == null) {
-            throw new IllegalArgumentException("override cannot be null");
-        }
-        localOverrides.add(override);
-        setMatParamOverrideRefresh();
-    }
-
-    /**
-     * Remove a local material parameter override if it exists.
-     *
-     * @param override The override to remove.
-     * @see MatParamOverride
-     */
-    public void removeMatParamOverride(MatParamOverride override) {
-        if (localOverrides.remove(override)) {
-            setMatParamOverrideRefresh();
-        }
-    }
-
-    /**
-     * Remove all local material parameter overrides.
-     *
-     * @see #addMatParamOverride(com.jme3.material.MatParamOverride)
-     */
-    public void clearMatParamOverrides() {
-        if (!localOverrides.isEmpty()) {
-            setMatParamOverrideRefresh();
-        }
-        localOverrides.clear();
     }
 
     /**
@@ -768,6 +696,7 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
         controls.add(control);
         control.setSpatial(this);
         boolean after = requiresUpdates();
+
         // If the requirement to be updated has changed
         // then we need to let the parent node know so it
         // can rebuild its update list.
@@ -791,6 +720,7 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
             }
         }
         boolean after = requiresUpdates();
+
         // If the requirement to be updated has changed
         // then we need to let the parent node know so it
         // can rebuild its update list.
@@ -816,12 +746,14 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
         }
 
         boolean after = requiresUpdates();
+
         // If the requirement to be updated has changed
         // then we need to let the parent node know so it
         // can rebuild its update list.
         if( parent != null && before != after ) {
             parent.invalidateUpdateList();
         }
+
         return result;
     }
 
@@ -906,10 +838,7 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
         if ((refreshFlags & RF_BOUND) != 0) {
             updateWorldBound();
         }
-        if ((refreshFlags & RF_MATPARAM_OVERRIDE) != 0) {
-            updateMatParamOverrides();
-        }
-        
+
         assert refreshFlags == 0;
     }
 
@@ -1363,7 +1292,6 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
         // the transforms and stuff get refreshed.
         clone.setTransformRefresh();
         clone.setLightListRefresh();
-        clone.setMatParamOverrideRefresh();
 
         return clone;
     }
@@ -1383,13 +1311,6 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
             // Set the new owner of the light lists
             clone.localLights.setOwner(clone);
             clone.worldLights.setOwner(clone);
-
-            clone.worldOverrides = new SafeArrayList<>(MatParamOverride.class);
-            clone.localOverrides = new SafeArrayList<>(MatParamOverride.class);
-
-            for (MatParamOverride override : localOverrides) {
-                clone.localOverrides.add((MatParamOverride) override.clone());
-            }
 
             // No need to force cloned to update.
             // This node already has the refresh flags
@@ -1412,7 +1333,6 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
             clone.setBoundRefresh();
             clone.setTransformRefresh();
             clone.setLightListRefresh();
-            clone.setMatParamOverrideRefresh();
 
             clone.controls = new SafeArrayList<Control>(Control.class);
             for (int i = 0; i < controls.size(); i++) {
@@ -1468,7 +1388,6 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
         // the transforms and stuff get refreshed.
         clone.setTransformRefresh();
         clone.setLightListRefresh();
-        clone.setMatParamOverrideRefresh();
 
         return clone;
     }
@@ -1500,8 +1419,6 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
         this.localLights = cloner.clone(localLights);
         this.worldTransform = cloner.clone(worldTransform);
         this.localTransform = cloner.clone(localTransform);
-        this.worldOverrides = cloner.clone(worldOverrides);
-        this.localOverrides = cloner.clone(localOverrides);
         this.controls = cloner.clone(controls);
 
         // Cloner doesn't handle maps on its own just yet.
@@ -1524,22 +1441,16 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
     }
 
     public void setUserData(String key, Object data) {
-        if (data == null) {
-            if (userData != null) {
-                userData.remove(key);
-                if(userData.isEmpty()) {
-                    userData = null;
-                }
-            }
+        if (userData == null) {
+            userData = new HashMap<String, Savable>();
+        }
+
+        if(data == null){
+            userData.remove(key);
+        }else if (data instanceof Savable) {
+            userData.put(key, (Savable) data);
         } else {
-            if (userData == null) {
-                userData = new HashMap<String, Savable>();
-            }
-            if (data instanceof Savable) {
-                userData.put(key, (Savable) data);
-            } else {
-                userData.put(key, new UserData(UserData.getObjectType(data), data));
-            }
+            userData.put(key, new UserData(UserData.getObjectType(data), data));
         }
     }
 
@@ -1604,7 +1515,6 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
         capsule.write(shadowMode, "shadow_mode", ShadowMode.Inherit);
         capsule.write(localTransform, "transform", Transform.IDENTITY);
         capsule.write(localLights, "lights", null);
-        capsule.writeSavableArrayList(new ArrayList(localOverrides), "overrides", null);
 
         // Shallow clone the controls array to convert its type.
         capsule.writeSavableArrayList(new ArrayList(controls), "controlsList", null);
@@ -1627,14 +1537,6 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
 
         localLights = (LightList) ic.readSavable("lights", null);
         localLights.setOwner(this);
-
-        ArrayList<MatParamOverride> localOverridesList = ic.readSavableArrayList("overrides", null);
-        if (localOverridesList == null) {
-            localOverrides = new SafeArrayList<>(MatParamOverride.class);
-        } else {
-            localOverrides = new SafeArrayList(MatParamOverride.class, localOverridesList);
-        }
-        worldOverrides = new SafeArrayList<>(MatParamOverride.class);
 
         //changed for backward compatibility with j3o files generated before the AnimControl/SkeletonControl split
         //the AnimControl creates the SkeletonControl for old files and add it to the spatial.
@@ -1806,35 +1708,10 @@ public abstract class Spatial implements Savable, Cloneable, Collidable, Cloneab
     }
 
     /**
-     * Visit each scene graph element ordered by DFS with the default post order mode.
+     * Visit each scene graph element ordered by DFS
      * @param visitor
-     * @see #depthFirstTraversal(com.jme3.scene.SceneGraphVisitor, com.jme3.scene.Spatial.DFSMode) 
      */
-    public void depthFirstTraversal(SceneGraphVisitor visitor) {
-        depthFirstTraversal(visitor, DFSMode.POST_ORDER);
-    }
-    
-    /**
-     * Specifies the mode of the depth first search.
-     */
-    public static enum DFSMode {
-        /**
-         * Pre order: the current spatial is visited first, then its children.
-         */
-        PRE_ORDER,
-        /**
-         * Post order: the children are visited first, then the parent.
-         */
-        POST_ORDER;
-    }
-    
-    /**
-     * Visit each scene graph element ordered by DFS.
-     * There are two modes: pre order and post order.
-     * @param visitor
-     * @param mode the traversal mode: pre order or post order
-     */
-    public abstract void depthFirstTraversal(SceneGraphVisitor visitor, DFSMode mode);
+    public abstract void depthFirstTraversal(SceneGraphVisitor visitor);
 
     /**
      * Visit each scene graph element ordered by BFS

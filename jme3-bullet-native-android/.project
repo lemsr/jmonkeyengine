@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>jme3-bullet-native-android</name>
+	<comment></comment>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>org.eclipse.jdt.core.javabuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>org.springsource.ide.eclipse.gradle.core.nature</nature>
+		<nature>org.eclipse.jdt.core.javanature</nature>
+	</natures>
+	<linkedResources>
+		<link>
+			<name>cpp</name>
+			<type>2</type>
+			<location>/Users/Erwin/Workspaces/sigtraining/jmonkeyengine/jme3-bullet-native/src/native/cpp</location>
+		</link>
+	</linkedResources>
+</projectDescription>

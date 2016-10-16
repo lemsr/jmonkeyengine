@@ -51,12 +51,6 @@ javadoc {
     }
 }
 
-test {
-    testLogging {
-        exceptionFormat = 'full'
-    }
-}
-
 task sourcesJar(type: Jar, dependsOn: classes, description: 'Creates a jar from the source files.') {
     classifier = 'sources'
     from sourceSets*.allSource
@@ -67,11 +61,11 @@ task javadocJar(type: Jar, dependsOn: javadoc, description: 'Creates a jar from 
     from javadoc.destinationDir
 }
 
-ext.pomConfig = {
+def pomConfig = {
     name POM_NAME
     description POM_DESCRIPTION
     url POM_URL
-    inceptionYear POM_INCEPTION_YEAR
+    inceptionYear '2016'
     scm {
         url POM_SCM_URL
         connection POM_SCM_CONNECTION
@@ -84,6 +78,7 @@ ext.pomConfig = {
             distribution POM_LICENSE_DISTRIBUTION
         }
     }
+    // from http://hub.jmonkeyengine.org/introduction/team/
     developers {
         developer {
             name 'jMonkeyEngine Team'
@@ -102,7 +97,6 @@ task writeFullPom {
         }.writeTo(pomFile)
     }
 }
-
 assemble.dependsOn(writeFullPom)
 install.dependsOn(writeFullPom)
 uploadArchives.dependsOn(writeFullPom)
@@ -110,7 +104,7 @@ uploadArchives.dependsOn(writeFullPom)
 artifacts {
     archives jar
     archives sourcesJar
-    if (buildJavaDoc == "true") {
+    if(buildJavaDoc == "true"){
         archives javadocJar
     }
     archives writeFullPom.outputs.files[0]
@@ -129,4 +123,13 @@ uploadArchives {
         
         pom.project pomConfig
     }
+}
+
+task createFolders(description: 'Creates the source folders if they do not exist.') doLast {
+//    sourceSets*.allSource*.srcDirs*.each { File srcDir ->
+//        if (!srcDir.isDirectory()) {
+//            println "Creating source folder: ${srcDir}"
+//            srcDir.mkdirs()
+//        }
+//    }
 }

@@ -38,11 +38,10 @@ import com.jme3.material.Technique;
 import com.jme3.material.TechniqueDef;
 import com.jme3.shader.Shader.ShaderType;
 import java.util.List;
-import java.util.regex.*;
 
 /**
  * This class is the base for a shader generator using the ShaderNodes system,
- * it contains basis mechanism of generation, but no actual generation code.
+ * it contains basis mechnaism of generation, but no actual generation code.
  * This class is abstract, any Shader generator must extend it.
  *
  * @author Nehon
@@ -58,13 +57,9 @@ public abstract class ShaderGenerator {
      */
     protected int indent;
     /**
-     * the technique def to use for the shader generation
+     * the technique to use for the shader generation
      */
-    protected TechniqueDef techniqueDef = null;
-    /**
-     * Extension pattern
-     */
-    Pattern extensions = Pattern.compile("(#extension.*\\s+)");
+    protected Technique technique = null;    
 
     /**
      * Build a shaderGenerator
@@ -75,8 +70,8 @@ public abstract class ShaderGenerator {
         this.assetManager = assetManager;        
     }
     
-    public void initialize(TechniqueDef techniqueDef){
-        this.techniqueDef = techniqueDef;
+    public void initialize(Technique technique){
+        this.technique = technique;
     }
     
     /**
@@ -84,29 +79,24 @@ public abstract class ShaderGenerator {
      *
      * @return a Shader program
      */
-    public Shader generateShader(String definesSourceCode) {
-        if (techniqueDef == null) {
-            throw new UnsupportedOperationException("The shaderGenerator was not "
-                    + "properly initialized, call "
-                    + "initialize(TechniqueDef) before any generation");
+    public Shader generateShader() {
+        if(technique == null){
+            throw new UnsupportedOperationException("The shaderGenerator was not properly initialized, call initialize(Technique) before any generation");
         }
 
-        String techniqueName = techniqueDef.getName();
-        ShaderGenerationInfo info = techniqueDef.getShaderGenerationInfo();
+        DefineList defines = technique.getAllDefines();
+        TechniqueDef def = technique.getDef();
+        ShaderGenerationInfo info = def.getShaderGenerationInfo();
+
+        String vertexSource = buildShader(def.getShaderNodes(), info, ShaderType.Vertex);
+        String fragmentSource = buildShader(def.getShaderNodes(), info, ShaderType.Fragment);
 
         Shader shader = new Shader();
-        for (ShaderType type : ShaderType.values()) {
-            String extension = type.getExtension();
-            String language = getLanguageAndVersion(type);
-            String shaderSourceCode = buildShader(techniqueDef.getShaderNodes(), info, type);
-            
-            if (shaderSourceCode != null) {
-                String shaderSourceAssetName = techniqueName + "." + extension;
-                shader.addSource(type, shaderSourceAssetName, shaderSourceCode, definesSourceCode, language);
-            }
-        }
+        shader.initialize();
+        shader.addSource(Shader.ShaderType.Vertex, technique.getDef().getName() + ".vert", vertexSource, defines.getCompiled(), getLanguageAndVersion(ShaderType.Vertex));
+        shader.addSource(Shader.ShaderType.Fragment, technique.getDef().getName() + ".frag", fragmentSource, defines.getCompiled(), getLanguageAndVersion(ShaderType.Fragment));
         
-        techniqueDef = null;
+        technique = null;
         return shader;
     }
 
@@ -119,14 +109,6 @@ public abstract class ShaderGenerator {
      * @return the code of the generated vertex shader
      */
     protected String buildShader(List<ShaderNode> shaderNodes, ShaderGenerationInfo info, ShaderType type) {
-        if (type == ShaderType.TessellationControl ||
-            type == ShaderType.TessellationEvaluation || 
-            type == ShaderType.Geometry) {
-            // TODO: Those are not supported.
-            // Too much code assumes that type is either Vertex or Fragment
-            return null;
-        }
-        
         indent = 0;
 
         StringBuilder sourceDeclaration = new StringBuilder();
@@ -147,23 +129,7 @@ public abstract class ShaderGenerator {
 
         sourceDeclaration.append(source);
 
-        return moveExtensionsUp(sourceDeclaration);
-    }
-
-    /**
-     * parses the source and moves all the extensions at the top of the shader source as having extension declarations
-     * in the middle of a shader is against the specs and not supported by all drivers.
-     * @param sourceDeclaration
-     * @return
-     */
-    private String moveExtensionsUp(StringBuilder sourceDeclaration) {
-        Matcher m = extensions.matcher( sourceDeclaration.toString());
-        StringBuilder finalSource = new StringBuilder();
-        while(m.find()){
-            finalSource.append(m.group());
-        }
-        finalSource.append(m.replaceAll(""));
-        return finalSource.toString();
+        return sourceDeclaration.toString();
     }
 
     /**
@@ -226,10 +192,10 @@ public abstract class ShaderGenerator {
     }
 
     /**
-     * returns the language + version of the shader should be something like
+     * returns the laguage + version of the shader should be somthing like
      * "GLSL100" for glsl 1.0 "GLSL150" for glsl 1.5.
      *
-     * @param type the shader type for which the version should be returned.
+     * @param type the shader type for wich the version should be returned.
      *
      * @return the shaderLanguage and version.
      */
@@ -303,7 +269,7 @@ public abstract class ShaderGenerator {
 
     /**
      * Appends the given shaderNode main part to the shader declarative part. If
-     * needed the shader type can be determined by fetching the shaderNode's
+     * needed the sahder type can be determined by fetching the shaderNode's
      * definition type.
      *
      * @see ShaderNode#getDefinition()

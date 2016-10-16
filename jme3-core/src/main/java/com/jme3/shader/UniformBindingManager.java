@@ -36,7 +36,7 @@ import com.jme3.math.*;
 import com.jme3.renderer.Camera;
 import com.jme3.renderer.RenderManager;
 import com.jme3.system.Timer;
-import java.util.ArrayList;
+import java.util.List;
 
 /**
  * <code>UniformBindingManager</code> helps {@link RenderManager} to manage
@@ -84,8 +84,7 @@ public class UniformBindingManager {
      * Updates the given list of uniforms with {@link UniformBinding uniform bindings}
      * based on the current world state.
      */
-    public void updateUniformBindings(Shader shader) {
-        ArrayList<Uniform> params = shader.getBoundUniforms();
+    public void updateUniformBindings(List<Uniform> params) {
         for (int i = 0; i < params.size(); i++) {
             Uniform u = params.get(i);
             switch (u.getBinding()) {

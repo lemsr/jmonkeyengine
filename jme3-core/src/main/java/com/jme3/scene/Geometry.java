@@ -319,13 +319,6 @@ public class Geometry extends Spatial {
         worldLights.sort(true);
     }
 
-    @Override
-    protected void updateWorldLightList() {
-        super.updateWorldLightList();
-        // geometry requires lights to be sorted
-        worldLights.sort(true);
-    }
-
     /**
      * Associate this <code>Geometry</code> with a {@link GeometryGroupNode}.
      *
@@ -465,7 +458,7 @@ public class Geometry extends Spatial {
     }
 
     @Override
-    public void depthFirstTraversal(SceneGraphVisitor visitor, DFSMode mode) {
+    public void depthFirstTraversal(SceneGraphVisitor visitor) {
         visitor.visit(this);
     }
 

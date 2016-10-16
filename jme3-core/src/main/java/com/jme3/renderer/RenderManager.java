@@ -34,13 +34,8 @@ package com.jme3.renderer;
 import com.jme3.light.DefaultLightFilter;
 import com.jme3.light.LightFilter;
 import com.jme3.light.LightList;
-import com.jme3.material.MatParamOverride;
-import com.jme3.material.Material;
-import com.jme3.material.MaterialDef;
-import com.jme3.material.RenderState;
-import com.jme3.material.Technique;
-import com.jme3.material.TechniqueDef;
-import com.jme3.math.*;
+import com.jme3.material.*;
+import com.jme3.math.Matrix4f;
 import com.jme3.post.SceneProcessor;
 import com.jme3.profile.AppProfiler;
 import com.jme3.profile.AppStep;
@@ -50,12 +45,13 @@ import com.jme3.renderer.queue.RenderQueue;
 import com.jme3.renderer.queue.RenderQueue.Bucket;
 import com.jme3.renderer.queue.RenderQueue.ShadowMode;
 import com.jme3.scene.*;
-import com.jme3.shader.Shader;
+import com.jme3.shader.Uniform;
 import com.jme3.shader.UniformBinding;
 import com.jme3.shader.UniformBindingManager;
 import com.jme3.system.NullRenderer;
 import com.jme3.system.Timer;
 import com.jme3.util.SafeArrayList;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -74,25 +70,24 @@ import java.util.logging.Logger;
 public class RenderManager {
 
     private static final Logger logger = Logger.getLogger(RenderManager.class.getName());
-    private final Renderer renderer;
-    private final UniformBindingManager uniformBindingManager = new UniformBindingManager();
-    private final ArrayList<ViewPort> preViewPorts = new ArrayList<>();
-    private final ArrayList<ViewPort> viewPorts = new ArrayList<>();
-    private final ArrayList<ViewPort> postViewPorts = new ArrayList<>();
+    private Renderer renderer;
+    private UniformBindingManager uniformBindingManager = new UniformBindingManager();
+    private ArrayList<ViewPort> preViewPorts = new ArrayList<ViewPort>();
+    private ArrayList<ViewPort> viewPorts = new ArrayList<ViewPort>();
+    private ArrayList<ViewPort> postViewPorts = new ArrayList<ViewPort>();
     private Camera prevCam = null;
     private Material forcedMaterial = null;
     private String forcedTechnique = null;
     private RenderState forcedRenderState = null;
-    private final SafeArrayList<MatParamOverride> forcedOverrides = new SafeArrayList<>(MatParamOverride.class);
     private int viewX, viewY, viewWidth, viewHeight;
-    private final Matrix4f orthoMatrix = new Matrix4f();
-    private final LightList filteredLightList = new LightList(null);
+    private Matrix4f orthoMatrix = new Matrix4f();
+    private LightList filteredLightList = new LightList(null);
+    private String tmpTech;
     private boolean handleTranlucentBucket = true;
     private AppProfiler prof;
     private LightFilter lightFilter = new DefaultLightFilter();
     private TechniqueDef.LightMode preferredLightMode = TechniqueDef.LightMode.MultiPass;
     private int singlePassLightBatchSize = 1;
-
 
     /**
      * Create a high-level rendering interface over the
@@ -429,44 +424,6 @@ public class RenderManager {
     }
 
     /**
-     * Adds a forced material parameter to use when rendering geometries.
-     * <p>
-     * The provided parameter takes precedence over parameters set on the
-     * material or any overrides that exist in the scene graph that have the
-     * same name.
-     *
-     * @param override The override to add
-     * @see MatParamOverride
-     * @see #removeForcedMatParam(com.jme3.material.MatParamOverride)
-     */
-    public void addForcedMatParam(MatParamOverride override) {
-        forcedOverrides.add(override);
-    }
-
-    /**
-     * Remove a forced material parameter previously added.
-     *
-     * @param override The override to remove.
-     * @see #addForcedMatParam(com.jme3.material.MatParamOverride)
-     */
-    public void removeForcedMatParam(MatParamOverride override) {
-        forcedOverrides.remove(override);
-    }
-
-    /**
-     * Get the forced material parameters applied to rendered geometries.
-     * <p>
-     * Forced parameters can be added via
-     * {@link #addForcedMatParam(com.jme3.material.MatParamOverride)} or removed
-     * via {@link #removeForcedMatParam(com.jme3.material.MatParamOverride)}.
-     *
-     * @return The forced material parameters.
-     */
-    public SafeArrayList<MatParamOverride> getForcedMatParams() {
-        return forcedOverrides;
-    }
-
-    /**
      * Enable or disable alpha-to-coverage. 
      * <p>
      * When alpha to coverage is enabled and the renderer implementation
@@ -523,8 +480,8 @@ public class RenderManager {
      * Updates the given list of uniforms with {@link UniformBinding uniform bindings}
      * based on the current world state.
      */
-    public void updateUniformBindings(Shader shader) {
-        uniformBindingManager.updateUniformBindings(shader);
+    public void updateUniformBindings(List<Uniform> params) {
+        uniformBindingManager.updateUniformBindings(params);
     }
 
     /**
@@ -551,54 +508,45 @@ public class RenderManager {
      * for rendering the material, and the material's own render state is ignored.
      * Otherwise, the material's render state is used as intended.
      * 
-     * @param geom The geometry to render
-       * 
+     * @param g The geometry to render
+     * 
      * @see Technique
      * @see RenderState
      * @see Material#selectTechnique(java.lang.String, com.jme3.renderer.RenderManager) 
      * @see Material#render(com.jme3.scene.Geometry, com.jme3.renderer.RenderManager) 
      */
-    public void renderGeometry(Geometry geom) {
-        if (geom.isIgnoreTransform()) {
+    public void renderGeometry(Geometry g) {
+        if (g.isIgnoreTransform()) {
             setWorldMatrix(Matrix4f.IDENTITY);
         } else {
-            setWorldMatrix(geom.getWorldMatrix());
+            setWorldMatrix(g.getWorldMatrix());
         }
         
         // Perform light filtering if we have a light filter.
-        LightList lightList = geom.getWorldLightList();
+        LightList lightList = g.getWorldLightList();
         
         if (lightFilter != null) {
             filteredLightList.clear();
-            lightFilter.filterLights(geom, filteredLightList);
+            lightFilter.filterLights(g, filteredLightList);
             lightList = filteredLightList;
         }
-
-        Material material = geom.getMaterial();
 
         //if forcedTechnique we try to force it for render,
         //if it does not exists in the mat def, we check for forcedMaterial and render the geom if not null
         //else the geom is not rendered
         if (forcedTechnique != null) {
-            MaterialDef matDef = material.getMaterialDef();
-            if (matDef.getTechniqueDefs(forcedTechnique) != null) {
-
-                Technique activeTechnique = material.getActiveTechnique();
-
-                String previousTechniqueName = activeTechnique != null
-                        ? activeTechnique.getDef().getName()
-                        : TechniqueDef.DEFAULT_TECHNIQUE_NAME;
-
-                geom.getMaterial().selectTechnique(forcedTechnique, this);
+            if (g.getMaterial().getMaterialDef().getTechniqueDef(forcedTechnique) != null) {
+                tmpTech = g.getMaterial().getActiveTechnique() != null ? g.getMaterial().getActiveTechnique().getDef().getName() : "Default";
+                g.getMaterial().selectTechnique(forcedTechnique, this);
                 //saving forcedRenderState for future calls
                 RenderState tmpRs = forcedRenderState;
-                if (geom.getMaterial().getActiveTechnique().getDef().getForcedRenderState() != null) {
+                if (g.getMaterial().getActiveTechnique().getDef().getForcedRenderState() != null) {
                     //forcing forced technique renderState
-                    forcedRenderState = geom.getMaterial().getActiveTechnique().getDef().getForcedRenderState();
+                    forcedRenderState = g.getMaterial().getActiveTechnique().getDef().getForcedRenderState();
                 }
                 // use geometry's material
-                material.render(geom, lightList, this);
-                material.selectTechnique(previousTechniqueName, this);
+                g.getMaterial().render(g, lightList, this);
+                g.getMaterial().selectTechnique(tmpTech, this);
 
                 //restoring forcedRenderState
                 forcedRenderState = tmpRs;
@@ -607,13 +555,13 @@ public class RenderManager {
                 //If forcedTechnique does not exists, and forcedMaterial is not set, the geom MUST NOT be rendered
             } else if (forcedMaterial != null) {
                 // use forced material
-                forcedMaterial.render(geom, lightList, this);
+                forcedMaterial.render(g, lightList, this);
             }
         } else if (forcedMaterial != null) {
             // use forced material
-            forcedMaterial.render(geom, lightList, this);
+            forcedMaterial.render(g, lightList, this);
         } else {
-            material.render(geom, lightList, this);
+            g.getMaterial().render(g, lightList, this);
         }
     }
 
@@ -664,9 +612,7 @@ public class RenderManager {
 
             gm.getMaterial().preload(this);
             Mesh mesh = gm.getMesh();
-            if (mesh != null
-                    && mesh.getVertexCount() != 0
-                    && mesh.getTriangleCount() != 0) {
+            if (mesh != null) {
                 for (VertexBuffer vb : mesh.getBufferList().getArray()) {
                     if (vb.getData() != null && vb.getUsage() != VertexBuffer.Usage.CpuOnly) {
                         renderer.updateBufferData(vb);
@@ -691,10 +637,8 @@ public class RenderManager {
      * <p>
      * In addition to enqueuing the visible geometries, this method
      * also scenes which cast or receive shadows, by putting them into the
-     * RenderQueue's 
-     * {@link RenderQueue#addToShadowQueue(com.jme3.scene.Geometry, com.jme3.renderer.queue.RenderQueue.ShadowMode) 
-     * shadow queue}. Each Spatial which has its 
-     * {@link Spatial#setShadowMode(com.jme3.renderer.queue.RenderQueue.ShadowMode) shadow mode}
+     * RenderQueue's {@link RenderQueue#renderShadowQueue(GeometryList, RenderManager, Camera, boolean) shadow queue}.
+     * Each Spatial which has its {@link Spatial#setShadowMode(com.jme3.renderer.queue.RenderQueue.ShadowMode) shadow mode}
      * set to not off, will be put into the appropriate shadow queue, note that
      * this process does not check for frustum culling on any 
      * {@link ShadowMode#Cast shadow casters}, as they don't have to be
@@ -803,15 +747,6 @@ public class RenderManager {
      */
     public void setLightFilter(LightFilter lightFilter) {
         this.lightFilter = lightFilter;
-    }
-    
-    /**
-     * Returns the current LightFilter.
-     * 
-     * @return the current light filter 
-     */
-    public LightFilter getLightFilter() {
-        return this.lightFilter;
     }
 
     /**
@@ -1050,8 +985,7 @@ public class RenderManager {
      * (see {@link #renderTranslucentQueue(com.jme3.renderer.ViewPort) })</li>
      * <li>If any objects remained in the render queue, they are removed
      * from the queue. This is generally objects added to the 
-     * {@link RenderQueue#renderShadowQueue(com.jme3.renderer.queue.RenderQueue.ShadowMode, com.jme3.renderer.RenderManager, com.jme3.renderer.Camera, boolean) 
-     * shadow queue}
+     * {@link RenderQueue#renderShadowQueue(GeometryList, RenderManager, Camera, boolean) shadow queue}
      * which were not rendered because of a missing shadow renderer.</li>
      * </ul>
      * 

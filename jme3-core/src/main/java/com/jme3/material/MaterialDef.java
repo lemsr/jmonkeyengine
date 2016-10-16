@@ -32,11 +32,8 @@
 package com.jme3.material;
 
 import com.jme3.asset.AssetManager;
-import com.jme3.export.*;
 import com.jme3.shader.VarType;
 import com.jme3.texture.image.ColorSpace;
-
-import java.io.IOException;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -46,7 +43,7 @@ import java.util.logging.Logger;
  * 
  * @author Kirill Vainer
  */
-public class MaterialDef{
+public class MaterialDef {
 
     private static final Logger logger = Logger.getLogger(MaterialDef.class.getName());
 
@@ -54,7 +51,8 @@ public class MaterialDef{
     private String assetName;
     private AssetManager assetManager;
 
-    private Map<String, List<TechniqueDef>> techniques;
+    private List<TechniqueDef> defaultTechs;
+    private Map<String, TechniqueDef> techniques;
     private Map<String, MatParam> matParams;
 
     /**
@@ -72,8 +70,9 @@ public class MaterialDef{
     public MaterialDef(AssetManager assetManager, String name){
         this.assetManager = assetManager;
         this.name = name;
-        techniques = new HashMap<String, List<TechniqueDef>>();
+        techniques = new HashMap<String, TechniqueDef>();
         matParams = new HashMap<String, MatParam>();
+        defaultTechs = new ArrayList<TechniqueDef>();
         logger.log(Level.FINE, "Loaded material definition: {0}", name);
     }
 
@@ -136,7 +135,7 @@ public class MaterialDef{
      * @see ColorSpace
      */
     public void addMaterialParamTexture(VarType type, String name, ColorSpace colorSpace) {
-        matParams.put(name, new MatParamTexture(type, name, null, colorSpace));
+        matParams.put(name, new MatParamTexture(type, name, null , 0, colorSpace));
     }
     
     /**
@@ -165,35 +164,40 @@ public class MaterialDef{
 
     /**
      * Adds a new technique definition to this material definition.
-     *
+     * <p>
+     * If the technique name is "Default", it will be added
+     * to the list of {@link MaterialDef#getDefaultTechniques() default techniques}.
+     * 
      * @param technique The technique definition to add.
      */
     public void addTechniqueDef(TechniqueDef technique) {
-        List<TechniqueDef> list = techniques.get(technique.getName());
-        if (list == null) {
-            list = new ArrayList<>();
-            techniques.put(technique.getName(), list);
+        if (technique.getName().equals("Default")) {
+            defaultTechs.add(technique);
+        } else {
+            techniques.put(technique.getName(), technique);
         }
-        list.add(technique);
     }
 
     /**
-     * Returns technique definitions with the given name.
-       * 
-     * @param name The name of the technique definitions to find
-       * 
-     * @return The technique definitions, or null if cannot be found.
+     * Returns a list of all default techniques.
+     * 
+     * @return a list of all default techniques.
      */
-    public List<TechniqueDef> getTechniqueDefs(String name) {
+    public List<TechniqueDef> getDefaultTechniques(){
+        return defaultTechs;
+    }
+
+    /**
+     * Returns a technique definition with the given name.
+     * This does not include default techniques which can be
+     * retrieved via {@link MaterialDef#getDefaultTechniques() }.
+     * 
+     * @param name The name of the technique definition to find
+     * 
+     * @return The technique definition, or null if cannot be found.
+     */
+    public TechniqueDef getTechniqueDef(String name) {
         return techniques.get(name);
-    }
-
-    /**
-     *
-     * @return the list of all the technique definitions names.
-     */
-    public Collection<String> getTechniqueDefsNames(){
-        return techniques.keySet();
     }
 
 }

@@ -35,7 +35,6 @@ import com.jme3.material.RenderState;
 import com.jme3.material.RenderState.StencilOperation;
 import com.jme3.material.RenderState.TestFunction;
 import com.jme3.math.*;
-import com.jme3.opencl.OpenCLObjectManager;
 import com.jme3.renderer.*;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.Mesh.Mode;
@@ -91,7 +90,6 @@ public final class GLRenderer implements Renderer {
     private final Statistics statistics = new Statistics();
     private int vpX, vpY, vpW, vpH;
     private int clipX, clipY, clipW, clipH;
-    private int defaultAnisotropicFilter = 1;
     private boolean linearizeSrgbImages;
     private HashSet<String> extensions;
 
@@ -254,14 +252,18 @@ public final class GLRenderer implements Renderer {
 
         limits.put(Limits.FragmentTextureUnits, getInteger(GL.GL_MAX_TEXTURE_IMAGE_UNITS));
 
+//        gl.glGetInteger(GL.GL_MAX_VERTEX_UNIFORM_COMPONENTS, intBuf16);
+//        vertexUniforms = intBuf16.get(0);
+//        logger.log(Level.FINER, "Vertex Uniforms: {0}", vertexUniforms);
+//
+//        gl.glGetInteger(GL.GL_MAX_FRAGMENT_UNIFORM_COMPONENTS, intBuf16);
+//        fragUniforms = intBuf16.get(0);
+//        logger.log(Level.FINER, "Fragment Uniforms: {0}", fragUniforms);
         if (caps.contains(Caps.OpenGLES20)) {
-            limits.put(Limits.FragmentUniformVectors, getInteger(GL.GL_MAX_FRAGMENT_UNIFORM_VECTORS));
             limits.put(Limits.VertexUniformVectors, getInteger(GL.GL_MAX_VERTEX_UNIFORM_VECTORS));
         } else {
-            limits.put(Limits.FragmentUniformVectors, getInteger(GL.GL_MAX_FRAGMENT_UNIFORM_COMPONENTS) / 4);
             limits.put(Limits.VertexUniformVectors, getInteger(GL.GL_MAX_VERTEX_UNIFORM_COMPONENTS) / 4);
         }
-
         limits.put(Limits.VertexAttributes, getInteger(GL.GL_MAX_VERTEX_ATTRIBS));
         limits.put(Limits.TextureSize, getInteger(GL.GL_MAX_TEXTURE_SIZE));
         limits.put(Limits.CubemapSize, getInteger(GL.GL_MAX_CUBE_MAP_TEXTURE_SIZE));
@@ -472,17 +474,6 @@ public final class GLRenderer implements Renderer {
             {
                 sb.append("\t").append(cap.toString()).append("\n");
             }
-            
-            sb.append("\nHardware limits: \n");
-            for (Limits limit : Limits.values()) {
-                Integer value = limits.get(limit);
-                if (value == null) {
-                    value = 0;
-                }
-                sb.append("\t").append(limit.name()).append(" = ")
-                  .append(value).append("\n");
-            }
-            
             logger.log(Level.FINE, sb.toString());
         }
 
@@ -531,6 +522,7 @@ public final class GLRenderer implements Renderer {
             gl2.glEnable(GL2.GL_VERTEX_PROGRAM_POINT_SIZE);
             if (!caps.contains(Caps.CoreProfile)) {
                 gl2.glEnable(GL2.GL_POINT_SPRITE);
+                context.pointSprite = true;
             }
         }
     }
@@ -553,7 +545,6 @@ public final class GLRenderer implements Renderer {
     public void cleanup() {
         logger.log(Level.FINE, "Deleting objects and invalidating state");
         objManager.deleteAllObjects(this);
-        OpenCLObjectManager.getInstance().deleteAllObjects();
         statistics.clearMemory();
         invalidateState();
     }
@@ -601,14 +592,6 @@ public final class GLRenderer implements Renderer {
             gl.glClearColor(color.r, color.g, color.b, color.a);
             context.clearColor.set(color);
         }
-    }
-
-    @Override
-    public void setDefaultAnisotropicFilter(int level) {
-        if (level < 1) {
-            throw new IllegalArgumentException("level cannot be less than 1");
-        }
-        this.defaultAnisotropicFilter = level;
     }
 
     public void setAlphaToCoverage(boolean value) {
@@ -752,19 +735,6 @@ public final class GLRenderer implements Renderer {
                         throw new UnsupportedOperationException("Unrecognized blend mode: "
                                 + state.getBlendMode());
                 }
-                
-                if (state.getBlendEquation() != context.blendEquation || state.getBlendEquationAlpha() != context.blendEquationAlpha) {
-                    int colorMode = convertBlendEquation(state.getBlendEquation());
-                    int alphaMode;
-                    if (state.getBlendEquationAlpha() == RenderState.BlendEquationAlpha.InheritColor) {
-                        alphaMode = colorMode;
-                    } else {
-                        alphaMode = convertBlendEquationAlpha(state.getBlendEquationAlpha());
-                    }
-                    gl.glBlendEquationSeparate(colorMode, alphaMode);
-                    context.blendEquation = state.getBlendEquation();
-                    context.blendEquationAlpha = state.getBlendEquationAlpha();
-                }
             }
 
             context.blendMode = state.getBlendMode();
@@ -812,41 +782,6 @@ public final class GLRenderer implements Renderer {
         if (context.lineWidth != state.getLineWidth()) {
             gl.glLineWidth(state.getLineWidth());
             context.lineWidth = state.getLineWidth();
-        }
-    }
-
-    private int convertBlendEquation(RenderState.BlendEquation blendEquation) {
-        switch (blendEquation) {
-            case Add:
-                return GL2.GL_FUNC_ADD;
-            case Subtract:
-                return GL2.GL_FUNC_SUBTRACT;
-            case ReverseSubtract:
-                return GL2.GL_FUNC_REVERSE_SUBTRACT;
-            case Min:
-                return GL2.GL_MIN;
-            case Max:
-                return GL2.GL_MAX;
-            default:
-                throw new UnsupportedOperationException("Unrecognized blend operation: " + blendEquation);
-        }
-    }
-    
-    private int convertBlendEquationAlpha(RenderState.BlendEquationAlpha blendEquationAlpha) {
-        //Note: InheritColor mode should already be handled, that is why it does not belong the the switch case.
-        switch (blendEquationAlpha) {
-            case Add:
-                return GL2.GL_FUNC_ADD;
-            case Subtract:
-                return GL2.GL_FUNC_SUBTRACT;
-            case ReverseSubtract:
-                return GL2.GL_FUNC_REVERSE_SUBTRACT;
-            case Min:
-                return GL2.GL_MIN;
-            case Max:
-                return GL2.GL_MAX;
-            default:
-                throw new UnsupportedOperationException("Unrecognized alpha blend operation: " + blendEquationAlpha);
         }
     }
 
@@ -937,7 +872,6 @@ public final class GLRenderer implements Renderer {
 
     public void postFrame() {
         objManager.deleteUnused(this);
-        OpenCLObjectManager.getInstance().deleteUnusedObjects();
         gl.resetStats();
     }
 
@@ -1030,12 +964,12 @@ public final class GLRenderer implements Renderer {
                 gl.glUniform1i(loc, b.booleanValue() ? GL.GL_TRUE : GL.GL_FALSE);
                 break;
             case Matrix3:
-                fb = uniform.getMultiData();
+                fb = (FloatBuffer) uniform.getValue();
                 assert fb.remaining() == 9;
                 gl.glUniformMatrix3(loc, false, fb);
                 break;
             case Matrix4:
-                fb = uniform.getMultiData();
+                fb = (FloatBuffer) uniform.getValue();
                 assert fb.remaining() == 16;
                 gl.glUniformMatrix4(loc, false, fb);
                 break;
@@ -1044,23 +978,23 @@ public final class GLRenderer implements Renderer {
                 gl.glUniform1(loc, ib);
                 break;
             case FloatArray:
-                fb = uniform.getMultiData();
+                fb = (FloatBuffer) uniform.getValue();
                 gl.glUniform1(loc, fb);
                 break;
             case Vector2Array:
-                fb = uniform.getMultiData();
+                fb = (FloatBuffer) uniform.getValue();
                 gl.glUniform2(loc, fb);
                 break;
             case Vector3Array:
-                fb = uniform.getMultiData();
+                fb = (FloatBuffer) uniform.getValue();
                 gl.glUniform3(loc, fb);
                 break;
             case Vector4Array:
-                fb = uniform.getMultiData();
+                fb = (FloatBuffer) uniform.getValue();
                 gl.glUniform4(loc, fb);
                 break;
             case Matrix4Array:
-                fb = uniform.getMultiData();
+                fb = (FloatBuffer) uniform.getValue();
                 gl.glUniformMatrix4(loc, false, fb);
                 break;
             case Int:
@@ -1648,13 +1582,15 @@ public final class GLRenderer implements Renderer {
             if (fb.getNumColorBuffers() == 0) {
                 // make sure to select NONE as draw buf
                 // no color buffer attached.
-                if (context.boundDrawBuf != NONE) {
-                    gl2.glDrawBuffer(GL.GL_NONE);
-                    context.boundDrawBuf = NONE;
-                }
-                if (context.boundReadBuf != NONE) {
-                    gl2.glReadBuffer(GL.GL_NONE);
-                    context.boundReadBuf = NONE;
+                if (gl2 != null) {
+                    if (context.boundDrawBuf != NONE) {
+                        gl2.glDrawBuffer(GL.GL_NONE);
+                        context.boundDrawBuf = NONE;
+                    }
+                    if (context.boundReadBuf != NONE) {
+                        gl2.glReadBuffer(GL.GL_NONE);
+                        context.boundReadBuf = NONE;
+                    }
                 }
             } else {
                 if (fb.getNumColorBuffers() > limits.get(Limits.FrameBufferAttachments)) {
@@ -1673,21 +1609,24 @@ public final class GLRenderer implements Renderer {
                                 + " by the video hardware!");
                     }
 
-                    intBuf16.clear();
-                    for (int i = 0; i < fb.getNumColorBuffers(); i++) {
-                        intBuf16.put(GLFbo.GL_COLOR_ATTACHMENT0_EXT + i);
-                    }
+                    if (context.boundDrawBuf != MRT_OFF + fb.getNumColorBuffers()) {
+                        intBuf16.clear();
+                        for (int i = 0; i < fb.getNumColorBuffers(); i++) {
+                            intBuf16.put(GLFbo.GL_COLOR_ATTACHMENT0_EXT + i);
+                        }
 
-                    intBuf16.flip();
-                    glext.glDrawBuffers(intBuf16);
-                    context.boundDrawBuf = MRT_OFF + fb.getNumColorBuffers();
-                    
+                        intBuf16.flip();
+                        glext.glDrawBuffers(intBuf16);
+                        context.boundDrawBuf = MRT_OFF + fb.getNumColorBuffers();
+                    }
                 } else {
                     RenderBuffer rb = fb.getColorBuffer(fb.getTargetIndex());
                     // select this draw buffer
-                    if (context.boundDrawBuf != rb.getSlot()) {
-                        gl2.glDrawBuffer(GLFbo.GL_COLOR_ATTACHMENT0_EXT + rb.getSlot());
-                        context.boundDrawBuf = rb.getSlot();
+                    if (gl2 != null) {
+                        if (context.boundDrawBuf != rb.getSlot()) {
+                            gl2.glDrawBuffer(GLFbo.GL_COLOR_ATTACHMENT0_EXT + rb.getSlot());
+                            context.boundDrawBuf = rb.getSlot();
+                        }
                     }
                 }
             }
@@ -1933,18 +1872,13 @@ public final class GLRenderer implements Renderer {
             gl.glTexParameteri(target, GL.GL_TEXTURE_MIN_FILTER, convertMinFilter(tex.getMinFilter(), haveMips));
             curState.minFilter = tex.getMinFilter();
         }
-
-        int desiredAnisoFilter = tex.getAnisotropicFilter() == 0
-                ? defaultAnisotropicFilter
-                : tex.getAnisotropicFilter();
-
         if (caps.contains(Caps.TextureFilterAnisotropic)
-                && curState.anisoFilter != desiredAnisoFilter) {
+                && curState.anisoFilter != tex.getAnisotropicFilter()) {
             bindTextureAndUnit(target, image, unit);
             gl.glTexParameterf(target,
                     GLExt.GL_TEXTURE_MAX_ANISOTROPY_EXT,
-                    desiredAnisoFilter);
-            curState.anisoFilter = desiredAnisoFilter;
+                    tex.getAnisotropicFilter());
+            curState.anisoFilter = tex.getAnisotropicFilter();
         }
 
         switch (tex.getType()) {
@@ -2755,15 +2689,12 @@ public final class GLRenderer implements Renderer {
     }
 
     public void renderMesh(Mesh mesh, int lod, int count, VertexBuffer[] instanceData) {
-        if (mesh.getVertexCount() == 0 || mesh.getTriangleCount() == 0 || count == 0) {
+        if (mesh.getVertexCount() == 0) {
             return;
         }
 
-        if (count > 1 && !caps.contains(Caps.MeshInstancing)) {
-            throw new RendererException("Mesh instancing is not supported by the video hardware");
-        }
-
-        if (mesh.getLineWidth() != 1f && context.lineWidth != mesh.getLineWidth()) {
+        //this is kept for backward compatibility.
+        if (mesh.getLineWidth() != -1 && context.lineWidth != mesh.getLineWidth()) {
             gl.glLineWidth(mesh.getLineWidth());
             context.lineWidth = mesh.getLineWidth();
         }

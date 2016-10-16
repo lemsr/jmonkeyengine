@@ -111,7 +111,7 @@ public class SkeletonControl extends AbstractControl implements Cloneable, JmeCl
      * Material references used for hardware skinning
      */
     private Set<Material> materials = new HashSet<Material>();
-    
+
     /**
      * Serialization only. Do not use.
      */
@@ -204,9 +204,6 @@ public class SkeletonControl extends AbstractControl implements Cloneable, JmeCl
      * @param skeleton the skeleton
      */
     public SkeletonControl(Skeleton skeleton) {
-        if (skeleton == null) {
-            throw new IllegalArgumentException("skeleton cannot be null");
-        }
         this.skeleton = skeleton;
     }
 
@@ -255,8 +252,7 @@ public class SkeletonControl extends AbstractControl implements Cloneable, JmeCl
                     // is operating on this material, in that case, user
                     // is sharing materials between models which is NOT allowed
                     // when hardware skinning used.
-                    
-                    Logger.getLogger(SkeletonControl.class.getName()).log(Level.SEVERE,
+                    throw new UnsupportedOperationException(
                             "Material instances cannot be shared when hardware skinning is used. " +
                             "Ensure all models use unique material instances."
                     );
@@ -410,23 +406,7 @@ public class SkeletonControl extends AbstractControl implements Cloneable, JmeCl
         // Not automatic set cloning yet
         Set<Material> newMaterials = new HashSet<Material>();
         for( Material m : this.materials ) {
-            Material mClone = cloner.clone(m);
-            newMaterials.add(mClone);
-            if( mClone != m ) {
-                // Material was really cloned so clear the bone matrices in case
-                // this is hardware skinned.  This allows a local version to be
-                // used and will be reset on the material.  Really this just avoids
-                // the 'safety' check in controlRenderHardware().  Right now material
-                // doesn't clone itself with the cloner (and doesn't clone its parameters)
-                // else this would be unnecessary.
-                MatParam boneMatrices = mClone.getParam("BoneMatrices");
-                
-                // ...because for some strange reason you can't clear a non-existant 
-                // parameter.
-                if( boneMatrices != null ) {                    
-                    mClone.clearParam("BoneMatrices");
-                }
-            }
+            newMaterials.add(cloner.clone(m));
         }
         this.materials = newMaterials;
     }

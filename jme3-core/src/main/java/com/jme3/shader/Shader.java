@@ -45,63 +45,44 @@ public final class Shader extends NativeObject {
     /**
      * A list of all shader sources currently attached.
      */
-    private final ArrayList<ShaderSource> shaderSourceList;
+    private ArrayList<ShaderSource> shaderSourceList;
 
     /**
      * Maps uniform name to the uniform variable.
      */
-    private final ListMap<String, Uniform> uniforms;
-    
-    /**
-     * Uniforms bound to {@link UniformBinding}s.
-     * 
-     * Managed by the {@link UniformBindingManager}.
-     */
-    private final ArrayList<Uniform> boundUniforms;
+    private ListMap<String, Uniform> uniforms;
 
     /**
      * Maps attribute name to the location of the attribute in the shader.
      */
-    private final IntMap<Attribute> attribs;
+    private IntMap<Attribute> attribs;
 
     /**
      * Type of shader. The shader will control the pipeline of it's type.
      */
     public static enum ShaderType {
-
         /**
          * Control fragment rasterization. (e.g color of pixel).
          */
-        Fragment("frag"),
+        Fragment,
+
         /**
          * Control vertex processing. (e.g transform of model to clip space)
          */
-        Vertex("vert"),
-        /**
-         * Control geometry assembly. (e.g compile a triangle list from input
-         * data)
-         */
-        Geometry("geom"),
-        /**
-         * Controls tesselation factor (e.g how often a input patch should be
-         * subdivided)
-         */
-        TessellationControl("tsctrl"),
-        /**
-         * Controls tesselation transform (e.g similar to the vertex shader, but
-         * required to mix inputs manual)
-         */
-        TessellationEvaluation("tseval");
+        Vertex,
 
-        private String extension;
-        
-        public String getExtension() {
-            return extension;
-        }
-        
-        private ShaderType(String extension) {
-            this.extension = extension;
-        }
+        /**
+         * Control geometry assembly. (e.g compile a triangle list from input data)
+         */
+        Geometry,
+        /**
+         * Controls tesselation factor (e.g how often a input patch should be subdivided)
+         */
+        TessellationControl,
+        /**
+         * Controls tesselation transform (e.g similar to the vertex shader, but required to mix inputs manual)
+         */
+        TessellationEvaluation;
     }
 
     /**
@@ -215,15 +196,21 @@ public final class Shader extends NativeObject {
     }
 
     /**
+     * Initializes the shader for use, must be called after the 
+     * constructor without arguments is used.
+     */
+    public void initialize() {
+        shaderSourceList = new ArrayList<ShaderSource>();
+        uniforms = new ListMap<String, Uniform>();
+        attribs = new IntMap<Attribute>();
+    }
+    
+    /**
      * Creates a new shader, {@link #initialize() } must be called
      * after this constructor for the shader to be usable.
      */
     public Shader(){
         super();
-        shaderSourceList = new ArrayList<ShaderSource>();
-        uniforms = new ListMap<String, Uniform>();
-        attribs = new IntMap<Attribute>();
-        boundUniforms = new ArrayList<Uniform>();
     }
 
     /**
@@ -238,10 +225,6 @@ public final class Shader extends NativeObject {
         for (ShaderSource source : s.shaderSourceList){
             shaderSourceList.add( (ShaderSource)source.createDestructableClone() );
         }
-        
-        uniforms = null;
-        boundUniforms = null;
-        attribs = null;
     }
 
     /**
@@ -265,18 +248,6 @@ public final class Shader extends NativeObject {
         setUpdateNeeded();
     }
 
-    public void addUniformBinding(UniformBinding binding){
-        String uniformName = "g_" + binding.name();
-        Uniform uniform = uniforms.get(uniformName);
-        if (uniform == null) {
-            uniform = new Uniform();
-            uniform.name = uniformName;
-            uniform.binding = binding;
-            uniforms.put(uniformName, uniform);
-            boundUniforms.add(uniform);
-        }
-    }
-    
     public Uniform getUniform(String name){
         assert name.startsWith("m_") || name.startsWith("g_");
         Uniform uniform = uniforms.get(name);
@@ -305,10 +276,6 @@ public final class Shader extends NativeObject {
 
     public ListMap<String, Uniform> getUniformMap(){
         return uniforms;
-    }
-    
-    public ArrayList<Uniform> getBoundUniforms() {
-        return boundUniforms;
     }
 
     public Collection<ShaderSource> getSources(){

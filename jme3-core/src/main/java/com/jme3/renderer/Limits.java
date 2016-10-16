@@ -32,34 +32,51 @@
 package com.jme3.renderer;
 
 /**
- * <code>Limits</code> allows querying the limits of certain features in
+ * <code>Limits</code> allows querying the limits of certain features in 
  * {@link Renderer}.
  * <p>
  * For example, maximum texture sizes or number of samples.
- *
+ * 
  * @author Kirill Vainer
  */
 public enum Limits {
     /**
-     * Maximum number of vertex texture units, or number of textures that can be
-     * used in the vertex shader.
+     * Maximum number of vertex texture units, or number of textures
+     * that can be used in the vertex shader.
      */
     VertexTextureUnits,
+    
     /**
-     * Maximum number of fragment texture units, or number of textures that can
-     * be used in the fragment shader.
+     * Maximum number of fragment texture units, or number of textures
+     * that can be used in the fragment shader.
      */
     FragmentTextureUnits,
-    FragmentUniformVectors,
-    VertexUniformVectors,
+    
+    FragmentUniforms,
+    
     VertexAttributes,
+    
     FrameBufferSamples,
+    
     FrameBufferAttachments,
+    
     FrameBufferMrtAttachments,
+    
     RenderBufferSize,
+    
     TextureSize,
+    
     CubemapSize,
+    
+    VertexCount,
+    
+    TriangleCount,
+    
     ColorTextureSamples,
+    
     DepthTextureSamples,
+
+    VertexUniformVectors,
+    
     TextureAnisotropy,
 }

@@ -43,15 +43,6 @@ public final class DefaultLightFilter implements LightFilter {
 
     private Camera camera;
     private final HashSet<Light> processedLights = new HashSet<Light>();
-    private final LightProbeBlendingStrategy probeBlendStrat;
-
-    public DefaultLightFilter() {
-        probeBlendStrat = new BasicProbeBlendingStrategy();
-    }
-
-    public DefaultLightFilter(LightProbeBlendingStrategy probeBlendStrat) {
-        this.probeBlendStrat = probeBlendStrat;
-    }
     
     @Override
     public void setCamera(Camera camera) {
@@ -66,7 +57,6 @@ public final class DefaultLightFilter implements LightFilter {
         TempVars vars = TempVars.get();
         try {
             LightList worldLights = geometry.getWorldLightList();
-           
             for (int i = 0; i < worldLights.size(); i++) {
                 Light light = worldLights.get(i);
 
@@ -98,17 +88,9 @@ public final class DefaultLightFilter implements LightFilter {
                         }
                     }
                 }
-                
-                if (light.getType() == Light.Type.Probe) {
-                    probeBlendStrat.registerProbe((LightProbe) light);
-                } else {
-                    filteredLightList.add(light);
-                }
-                
-            }
-            
-            probeBlendStrat.populateProbes(geometry, filteredLightList);
 
+                filteredLightList.add(light);
+            }
         } finally {
             vars.release();
         }

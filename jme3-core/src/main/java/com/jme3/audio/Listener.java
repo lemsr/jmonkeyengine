@@ -36,9 +36,9 @@ import com.jme3.math.Vector3f;
 
 public class Listener {
 
-    private final Vector3f location;
-    private final Vector3f velocity;
-    private final Quaternion rotation;
+    private Vector3f location;
+    private Vector3f velocity;
+    private Quaternion rotation;
     private float volume = 1;
     private AudioRenderer renderer;
 

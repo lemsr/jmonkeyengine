@@ -56,6 +56,16 @@ public class RenderContext {
     public boolean depthTestEnabled = false;
 
     /**
+     * @see RenderState#setAlphaFallOff(float) 
+     */
+    public float alphaTestFallOff = 0f;
+
+    /**
+     * @see RenderState#setAlphaTest(boolean) 
+     */
+    public boolean alphaTestEnabled = false;
+
+    /**
      * @see RenderState#setDepthWrite(boolean) 
      */
     public boolean depthWriteEnabled = true;
@@ -101,19 +111,14 @@ public class RenderContext {
     public RenderState.BlendMode blendMode = RenderState.BlendMode.Off;
 
     /**
-     * @see RenderState#setBlendEquation(com.jme3.material.RenderState.BlendEquation) 
-     */
-    public RenderState.BlendEquation blendEquation = RenderState.BlendEquation.Add;
-    
-    /**
-     * @see RenderState#setBlendEquationAlpha(com.jme3.material.RenderState.BlendEquationAlpha) 
-     */
-    public RenderState.BlendEquationAlpha blendEquationAlpha = RenderState.BlendEquationAlpha.InheritColor;
-
-    /**
      * @see RenderState#setWireframe(boolean) 
      */
     public boolean wireframe = false;
+
+    /**
+     * @see RenderState#setPointSprite(boolean) 
+     */
+    public boolean pointSprite = false;
 
     /**
      * @see Renderer#setShader(com.jme3.shader.Shader) 
@@ -256,6 +261,7 @@ public class RenderContext {
     public void reset(){
         cullMode = RenderState.FaceCullMode.Off;
         depthTestEnabled = false;
+        alphaTestFallOff = 0f;
         depthWriteEnabled = false;
         colorWriteEnabled = false;
         clipRectEnabled = false;
@@ -264,8 +270,6 @@ public class RenderContext {
         polyOffsetUnits = 0;
         pointSize = 1;
         blendMode = RenderState.BlendMode.Off;
-        blendEquation = RenderState.BlendEquation.Add;
-        blendEquationAlpha = RenderState.BlendEquationAlpha.InheritColor;
         wireframe = false;
         boundShaderProgram = 0;
         boundShader = null;

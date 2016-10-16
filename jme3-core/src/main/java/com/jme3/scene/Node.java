@@ -75,6 +75,7 @@ public class Node extends Spatial {
      * requiresUpdate() method.
      */
     private SafeArrayList<Spatial> updateList = null;
+
     /**
      * False if the update list requires rebuilding.  This is Node.class
      * specific and therefore not included as part of the Spatial update flags.
@@ -99,6 +100,7 @@ public class Node extends Spatial {
      */
     public Node(String name) {
         super(name);
+
         // For backwards compatibility, only clear the "requires
         // update" flag if we are not a subclass of Node.
         // This prevents subclass from silently failing to receive
@@ -140,20 +142,9 @@ public class Node extends Spatial {
     }
 
     @Override
-    protected void setMatParamOverrideRefresh() {
-        super.setMatParamOverrideRefresh();
-        for (Spatial child : children.getArray()) {
-            if ((child.refreshFlags & RF_MATPARAM_OVERRIDE) != 0) {
-                continue;
-            }
-
-            child.setMatParamOverrideRefresh();
-        }
-    }
-
-    @Override
     protected void updateWorldBound(){
         super.updateWorldBound();
+
         // for a node, the world bound is a combination of all it's children
         // bounds
         BoundingVolume resultBound = null;
@@ -248,19 +239,19 @@ public class Node extends Spatial {
             // This branch has no geometric state that requires updates.
             return;
         }
+
         if ((refreshFlags & RF_LIGHTLIST) != 0){
             updateWorldLightList();
         }
+
         if ((refreshFlags & RF_TRANSFORM) != 0){
             // combine with parent transforms- same for all spatial
             // subclasses.
             updateWorldTransforms();
         }
-        if ((refreshFlags & RF_MATPARAM_OVERRIDE) != 0) {
-            updateMatParamOverrides();
-        }
 
         refreshFlags &= ~RF_CHILD_LIGHTLIST;
+
         if (!children.isEmpty()) {
             // the important part- make sure child geometric state is refreshed
             // first before updating own world bound. This saves
@@ -296,6 +287,7 @@ public class Node extends Spatial {
 
         return count;
     }
+
     /**
      * <code>getVertexCount</code> returns the number of vertices contained
      * in all sub-branches of this node that contain geometry.
@@ -329,6 +321,7 @@ public class Node extends Spatial {
     public int attachChild(Spatial child) {
         return attachChildAt(child, children.size());
     }
+
     /**
      *
      * <code>attachChildAt</code> attaches a child to this node at an index. This node
@@ -352,18 +345,20 @@ public class Node extends Spatial {
             }
             child.setParent(this);
             children.add(index, child);
+
             // XXX: Not entirely correct? Forces bound update up the
             // tree stemming from the attached child. Also forces
             // transform update down the tree-
             child.setTransformRefresh();
             child.setLightListRefresh();
-            child.setMatParamOverrideRefresh();
             if (logger.isLoggable(Level.FINE)) {
                 logger.log(Level.FINE,"Child ({0}) attached to this node ({1})",
                         new Object[]{child.getName(), getName()});
             }
+
             invalidateUpdateList();
         }
+
         return children.size();
     }
 
@@ -438,8 +433,7 @@ public class Node extends Spatial {
             child.setTransformRefresh();
             // lights are also inherited from parent
             child.setLightListRefresh();
-            child.setMatParamOverrideRefresh();
-            
+
             invalidateUpdateList();
         }
         return child;
@@ -525,6 +519,7 @@ public class Node extends Spatial {
         }
         return null;
     }
+
     /**
      * determines if the provided Spatial is contained in the children list of
      * this node.
@@ -572,32 +567,39 @@ public class Node extends Spatial {
 
     public int collideWith(Collidable other, CollisionResults results){
         int total = 0;
+
         // optimization: try collideWith BoundingVolume to avoid possibly redundant tests on children
         // number 4 in condition is somewhat arbitrary. When there is only one child, the boundingVolume test is redundant at all.
         // The idea is when there are few children, it can be too expensive to test boundingVolume first.
         /*
         I'm removing this change until some issues can be addressed and I really
         think it needs to be implemented a better way anyway.
+
         First, it causes issues for anyone doing collideWith() with BoundingVolumes
         and expecting it to trickle down to the children.  For example, children
         with BoundingSphere bounding volumes and collideWith(BoundingSphere).  Doing
         a collision check at the parent level then has to do a BoundingSphere to BoundingBox
         collision which isn't resolved.  (Having to come up with a collision point in that
         case is tricky and the first sign that this is the wrong approach.)
+
         Second, the rippling changes this caused to 'optimize' collideWith() for this
         special use-case are another sign that this approach was a bit dodgy.  The whole
         idea of calculating a full collision just to see if the two shapes collide at all
         is very wasteful.
+
         A proper implementation should support a simpler boolean check that doesn't do
         all of that calculation.  For example, if 'other' is also a BoundingVolume (ie: 99.9%
         of all non-Ray cases) then a direct BV to BV intersects() test can be done.  So much
         faster.  And if 'other' _is_ a Ray then the BV.intersects(Ray) call can be done.
+
         I don't have time to do it right now but I'll at least un-break a bunch of peoples'
         code until it can be 'optimized' properly.  Hopefully it's not too late to back out
         the other dodgy ripples this caused.  -pspeed (hindsight-expert ;))
+
         Note: the code itself is relatively simple to implement but I don't have time to
         a) test it, and b) see if '> 4' is still a decent check for it.  Could be it's fast
         enough to do all the time for > 1.
+
         if (children.size() > 4)
         {
           BoundingVolume bv = this.getWorldBound();
@@ -690,6 +692,7 @@ public class Node extends Spatial {
         // Reset the fields of the clone that should be in a 'new' state.
         nodeClone.updateList = null;
         nodeClone.updateListValid = false; // safe because parent is nulled out in super.clone()
+
         return nodeClone;
     }
 
@@ -729,6 +732,7 @@ public class Node extends Spatial {
         // cloning this list is fine.
         this.updateList = cloner.clone(updateList);
     }
+
     @Override
     public void write(JmeExporter e) throws IOException {
         super.write(e);
@@ -740,6 +744,7 @@ public class Node extends Spatial {
         // XXX: Load children before loading itself!!
         // This prevents empty children list if controls query
         // it in Control.setSpatial().
+
         children = new SafeArrayList( Spatial.class,
                                       e.getCapsule(this).readSavableArrayList("children", null) );
 
@@ -749,6 +754,7 @@ public class Node extends Spatial {
                 child.parent = this;
             }
         }
+
         super.read(e);
     }
 
@@ -769,20 +775,15 @@ public class Node extends Spatial {
             }
         }
     }
+
     @Override
-    public void depthFirstTraversal(SceneGraphVisitor visitor, DFSMode mode) {
-        if (mode == DFSMode.POST_ORDER) {
-            for (Spatial child : children.getArray()) {
-                child.depthFirstTraversal(visitor);
-            }
-            visitor.visit(this);
-        } else { //pre order
-            visitor.visit(this);
-            for (Spatial child : children.getArray()) {
-                child.depthFirstTraversal(visitor);
-            }
+    public void depthFirstTraversal(SceneGraphVisitor visitor) {
+        for (Spatial child : children.getArray()) {
+            child.depthFirstTraversal(visitor);
         }
+        visitor.visit(this);
     }
+
     @Override
     protected void breadthFirstTraversal(SceneGraphVisitor visitor, Queue<Spatial> queue) {
         queue.addAll(children);

@@ -175,7 +175,7 @@ public class Mesh implements Savable, Cloneable, JmeCloneable {
     private IntMap<VertexBuffer> buffers = new IntMap<VertexBuffer>();
     private VertexBuffer[] lodLevels;
     private float pointSize = 1;
-    private float lineWidth = 1;
+    private float lineWidth = -1;
 
     private transient int vertexArrayID = -1;
 
@@ -589,26 +589,28 @@ public class Mesh implements Savable, Cloneable, JmeCloneable {
     }
 
     /**
-     * @deprecated Always returns <code>1.0</code> since point size is
-     * determined in the vertex shader.
+     * Returns the size of points for point meshes
      *
-     * @return <code>1.0</code>
+     * @return the size of points
      *
      * @see #setPointSize(float)
      */
-    @Deprecated
     public float getPointSize() {
-        return 1.0f;
+        return pointSize;
     }
 
     /**
-     * @deprecated Does nothing, since the size of {@link Mode#Points points} is
-     * determined via the vertex shader's <code>gl_PointSize</code> output.
+     * Set the size of points for meshes of mode {@link Mode#Points}.
+     * The point size is specified as on-screen pixels, the default
+     * value is 1.0. The point size
+     * does nothing if {@link RenderState#setPointSprite(boolean) point sprite}
+     * render state is enabled, in that case, the vertex shader must specify the
+     * point size by writing to <code>gl_PointSize</code>.
      *
-     * @param pointSize ignored
+     * @param pointSize The size of points
      */
-    @Deprecated
     public void setPointSize(float pointSize) {
+        this.pointSize = pointSize;
     }
 
     /**
@@ -632,9 +634,6 @@ public class Mesh implements Savable, Cloneable, JmeCloneable {
      */
     @Deprecated
     public void setLineWidth(float lineWidth) {
-        if (lineWidth < 1f) {
-            throw new IllegalArgumentException("lineWidth must be greater than or equal to 1.0");
-        }
         this.lineWidth = lineWidth;
     }
 

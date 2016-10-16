@@ -141,7 +141,7 @@ public class FilterPostProcessor implements SceneProcessor, Savable {
         fsQuad.setWidth(1);
         fsQuad.setHeight(1);
         
-        if (fbFormat == Format.RGB111110F && !renderer.getCaps().contains(Caps.PackedFloatTexture)) {
+        if (!renderer.getCaps().contains(Caps.PackedFloatTexture)) {
             fbFormat = Format.RGB8;
         }
         
@@ -448,7 +448,7 @@ public class FilterPostProcessor implements SceneProcessor, Savable {
         cameraInit = true;
         computeDepth = false;
 
-        if (renderFrameBuffer == null && renderFrameBufferMS == null) {
+        if (renderFrameBuffer == null) {
             outputBuffer = viewPort.getOutputFrameBuffer();
         }
 
@@ -518,10 +518,6 @@ public class FilterPostProcessor implements SceneProcessor, Savable {
      */
     public void setAssetManager(AssetManager assetManager) {
         this.assetManager = assetManager;
-    }
-
-    public void setFrameBufferFormat(Format fbFormat) {
-        this.fbFormat = fbFormat;
     }
 
     public void write(JmeExporter ex) throws IOException {

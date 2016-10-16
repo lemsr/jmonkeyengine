@@ -69,12 +69,11 @@ public class OpaqueComparator implements GeometryComparator {
         return spat.queueDistance;
     }
 
-    @Override
     public int compare(Geometry o1, Geometry o2) {
         Material m1 = o1.getMaterial();
         Material m2 = o2.getMaterial();
-        
-        int compareResult = Integer.compare(m1.getSortId(), m2.getSortId());
+
+        int compareResult = m2.getSortId() - m1.getSortId();
         if (compareResult == 0){
             // use the same shader.
             // sort front-to-back then.
